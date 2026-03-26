@@ -321,7 +321,7 @@ def step1_basic_analysis(passage: str, passage_dir: Path) -> dict:
    - 짧은 문장도 절대 합치지 마세요 (예: "That's not loyalty." 는 독립 문장)
    - 문장을 절대 분리하지 마세요 (세미콜론 ; 으로 연결된 것은 1문장)
 4. sentence_translations: 각 문장의 한국어 번역 (sentences와 정확히 같은 수, 같은 순서!)
-5. key_sentences: 시험 출제 가능성이 높은 핵심 문장 8개 (원문 그대로)
+5. key_sentences: 시험 출제 가능성이 높은 핵심 문장 8개 (문장 변경 금지. 원문 그대로)
 6. test_a: vocab에서 뜻 쓰기 테스트용 5개 단어 (영어)
 7. test_b: vocab에서 동의어 테스트용 5개 단어 (test_a와 겹치지 않게, 영어)
 8. test_c: vocab에서 철자 테스트용 5개 (한국어 뜻)
