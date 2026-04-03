@@ -11,13 +11,11 @@
 
 #### Phase 1: 즉시 수정 (독립적, 빠르게 가능)
 
-- [ ] **APP_PASSWORD 기본값 하드코딩 제거**
+- [x] **APP_PASSWORD 기본값 하드코딩 제거**
   - 현재: main.py: `os.getenv()`삭제
   - 변경: 기본값 제거, 환경변수 필수화 (미설정 시 서버 시작 실패)
 
-- [ ] **content_match 정답 셔플 오류 수정**
-  - pipeline.py 693-701행: 인덱스 기반 정답 체크가 셔플 후 어긋날 수 있음
-  - 변경: (text, is_correct) 쌍을 먼저 만들고 셔플
+- [x] **content_match 정답 셔플 오류 수정** — 코드 확인 결과 이미 (text, is_correct) 쌍 셔플로 구현됨 (수정 불필요)
 
 #### Phase 1.5: 로깅 시스템 구축
 
