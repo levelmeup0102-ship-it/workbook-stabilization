@@ -1,12 +1,12 @@
-import os
 import sys
 from loguru import logger
+from app.config import get_settings
 
 
 def setup_logger() -> None:
     logger.remove()
 
-    env = os.getenv("ENV", "dev")
+    env = get_settings().env
     level = "DEBUG" if env == "dev" else "INFO"
 
     logger.level("DEBUG", color="<cyan>")

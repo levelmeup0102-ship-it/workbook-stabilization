@@ -6,3 +6,4 @@ httpx
 loguru
 asyncio
 pydantic
+pydantic-settings

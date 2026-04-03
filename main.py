@@ -19,9 +19,9 @@ APP_VERSION = "v12-main-replace"
 for p in Path(".").glob("__pycache__"):
     shutil.rmtree(p, ignore_errors=True)
 
-APP_PASSWORD = os.getenv("APP_PASSWORD")
-if not APP_PASSWORD:
-    raise RuntimeError("APP_PASSWORD 환경변수가 설정되지 않았습니다")
+from app.config import get_settings
+
+APP_PASSWORD = get_settings().app_password.get_secret_value()
 
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
@@ -166,7 +166,7 @@ async def index():
 
 @app.get("/api/version")
 async def version():
-    key = os.getenv("ANTHROPIC_API_KEY", "NOT_SET")
+    key = get_settings().anthropic_api_key.get_secret_value()
 
     pf_exists = PASSAGES_FILE.exists()
     passage_count = 0
@@ -540,4 +540,4 @@ async def generate(request: Request):
 if __name__ == "__main__":
     import uvicorn
     
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    uvicorn.run(app, host="0.0.0.0", port=get_settings().port)

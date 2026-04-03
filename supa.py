@@ -4,8 +4,9 @@ from urllib.parse import quote
 
 import httpx
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+from app.config import get_settings
+SUPABASE_URL = get_settings().supabase_url
+SUPABASE_KEY = get_settings().supabase_key.get_secret_value()
 
 def _enabled():
     return bool(SUPABASE_URL and SUPABASE_KEY)

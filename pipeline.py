@@ -21,7 +21,8 @@ logger = logging.getLogger("pipeline")
 # ============================================================
 # 설정
 # ============================================================
-API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+from app.config import get_settings
+API_KEY = get_settings().anthropic_api_key.get_secret_value()
 MODEL = "claude-sonnet-4-20250514"
 TEMPLATE_DIR = Path(__file__).parent
 DATA_DIR = TEMPLATE_DIR / "data"

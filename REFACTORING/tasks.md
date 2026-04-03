@@ -19,18 +19,12 @@
 
 #### Phase 1.5: 로깅 시스템 구축
 
-- [ ] **구조화된 로깅 시스템 구축 (`app/logging/`)**
-  - loguru 사용
-    - Local: 색상 있는 콘솔 로그, DEBUG 레벨, stderr 출력
-    - Prod (Railway): 구조화된 로그, INFO 이상, stdout 출력
-  - 요청/응답 미들웨어 (method, path, status, time)
-  - Claude API 호출 로그 (stage명, 소요 시간, 재시도, 성공/실패)
-  - 예외 시 traceback 포함
-  - 기존 `print()`, `_safe_print()` 일괄 제거 후 loguru 전환
+- [x] **Simple Loguru 로깅 시스템 구축 (`app/log/`)**
+  - app/log/logging.py: setup_logger() — console sink only, 레벨별 색상
+  - app/log/events.py: 얇은 로깅 헬퍼 (앱 코드에서 loguru 직접 사용 금지)
 
-- [ ] **커스텀 에러 클래스 + exception handler (`app/errors/`)**
-  - 비즈니스 로직 에러 구분 (에러→HTTP 매핑은 구현 시 정의)
-  - FastAPI exception handler에서 catch → 구조화된 응답 + 로그
+- [ ] **커스텀 에러 클래스 + exception handler**
+  - 에러 분류가 실제로 필요해지는 시점에 생성 (현재 보류)
 
 - [ ] **BaseModel 기반 API 응답 스키마 (`app/schemas/responses.py`)**
   - HTTP 상태 코드별 구조화된 응답 모델
@@ -300,6 +294,13 @@
 - [ ] PWA 아이콘 512px 추가 (manifest.json)
 - [ ] dev/staging/prod 환경 분리 (Railway 환경 단위 활용, 변수·설정 환경별 분리)
 - [ ] 시크릿 정기 교체 체계 (JWT_SECRET, 서드파티 API 키, DB 비밀번호 등)
+- [ ] 구조화된 로깅 시스템 고도화 (Simple Loguru → 본격 전환)
+  - 구조화된 JSON 로그 (Prod: INFO 이상, stdout)
+  - 요청/응답 미들웨어 (method, path, status, time)
+  - Claude API 호출 로그 (stage명, 소요 시간, 재시도, 성공/실패)
+  - 기존 print(), _safe_print() 일괄 제거 후 loguru 전환
+  - Pydantic 이벤트 기반으로 events.py 내부 전환
+  - 커스텀 에러 클래스 + exception handler (에러→HTTP 매핑)
 
 ---
 
