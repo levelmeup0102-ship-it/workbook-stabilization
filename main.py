@@ -19,7 +19,9 @@ APP_VERSION = "v12-main-replace"
 for p in Path(".").glob("__pycache__"):
     shutil.rmtree(p, ignore_errors=True)
 
-APP_PASSWORD = os.getenv("APP_PASSWORD", "REDACTED")
+APP_PASSWORD = os.getenv("APP_PASSWORD")
+if not APP_PASSWORD:
+    raise RuntimeError("APP_PASSWORD 환경변수가 설정되지 않았습니다")
 
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
