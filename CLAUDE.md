@@ -1,8 +1,8 @@
 # 프로젝트 규칙
 
 ## 세션 시작 시
-- 대화가 시작되면 메모리의 일일 작업 기록(work_YYYYMMDD.md) 중 가장 최근 파일을 읽는다
-- 이전 작업 내용을 간단히 브리핑하고, 마지막 작업 지점과 미결 사항을 안내한다
+- 사용자가 `briefing`를 입력하면, 메모리의 일일 작업 기록(work_YYYYMMDD.md) 중 가장 최근 파일을 읽는다.
+- 사용자가 `briefing`를 입력하면, 이전 작업 내용을 간단히 브리핑하고, 마지막 작업 지점(WORKBOOK-STABILIZATION/REFACTORNG/날짜.md)과 미결 사항(WORKBOOK-STABILIZATION/REFACTORNG/task.md)을 안내한다
 - 사용자가 별도 지시를 하기 전에 먼저 브리핑을 제공한다
 
 ## 응답 언어
