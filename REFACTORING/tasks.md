@@ -39,19 +39,19 @@
 
 #### Phase 2: 데이터 레이어 기반 구축
 
-- [ ] **로컬 passages.json 제거 (확정)**
+- [x] **로컬 passages.json 제거 (확정)**
   - Supabase 전용으로 전환
   - `_load_db()`, `_save_db()`의 로컬 JSON 읽기/쓰기 코드 삭제
 
-- [ ] **`_load_db()` / `_save_db()` → repository 레이어 분리**
+- [x] **`_load_db()` / `_save_db()` → repository 레이어 분리**
   - 현재: main.py 전역 함수
   - 변경: repositories/ 하위로 이동
 
-- [ ] **supa 모듈 의존성 패턴 정리**
+- [x] **supa 모듈 의존성 패턴 정리**
   - 현재: 함수 내부에서 `import supa` + try/except 반복
   - 변경: 의존성 주입 또는 모듈 레벨 import로 통일
 
-- [ ] **passages 테이블 스키마 변경**
+- [x] **passages 테이블 스키마 변경**
   - 현재: book, unit, pid, title, passage_text
   - 변경: id(PK, auto increment), book_name, unit, lesson(구 pid), english_text, korean_translation, updated_at
   - title 컬럼 삭제 (프론트에서 unit+lesson 조합 표시), korean_translation 컬럼 추가
@@ -166,9 +166,19 @@
   - Claude 응답도 BaseModel/RootModel로 구조 검증
 
 - [ ] **검증/재시도 로직 공통화**
-  - step2(468-486행): 블록수 불일치 → 1회 재시도 → 원문 폴백
-  - step5(616-626행): 문장수 체크 → 1회 재시도 → 끝
-  - step6(681-692행): 10개 미만 → 1회 재시도 → 부분 교체
+  - **Supabase 통신**
+    - 네트워크 오류/타임아웃: 최대 3회 재시도
+    - 인증 실패 (401): 즉시 중단
+    - Rate limit (429): 백오프 후 재시도
+  - **Claude API 호출**
+    - 네트워크 오류/타임아웃: 최대 3회 재시도
+    - Rate limit (429): 백오프 후 재시도
+    - Context length 초과: 즉시 중단 (재시도 무의미)
+    - 응답 JSON 파싱 실패: 1회 재시도
+  - **기존 pipeline 재시도 (제각각 → 통일)**
+    - step2(468-486행): 블록수 불일치 → 1회 재시도 → 원문 폴백
+    - step5(616-626행): 문장수 체크 → 1회 재시도 → 끝
+    - step6(681-692행): 10개 미만 → 1회 재시도 → 부분 교체
   - 제각각인 패턴을 데코레이터 또는 wrapper로 통일
 
 - [ ] **전체 프롬프트 점검: 코드로 처리 가능한 항목을 Claude에게 요청하고 있는지 확인**

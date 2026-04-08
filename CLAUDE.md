@@ -4,12 +4,13 @@
 - 사용자가 `briefing`를 입력하면, 메모리의 일일 작업 기록(work_YYYYMMDD.md) 중 가장 최근 파일을 읽는다.
 - 사용자가 `briefing`를 입력하면, 이전 작업 내용을 간단히 브리핑하고, 마지막 작업 지점(WORKBOOK-STABILIZATION/REFACTORNG/날짜.md)과 미결 사항(WORKBOOK-STABILIZATION/REFACTORNG/task.md)을 안내한다
 - 사용자가 별도 지시를 하기 전에 먼저 브리핑을 제공한다
+- `작업 규칙`의 내용을 진행한다. 세션이 종료되기 전까지 사용자의 작업을 팔로업하여 `작업 규칙`의 내용을 진행한다 
 
 ## 응답 언어
 - 한국어로 응답한다
 
 ## 작업 규칙
-- tasks.md에서 완료된 작업은 체크 표시(`[x]`)하고, 완료된 내용을 그대로 복사하여 날짜별 파일(REFACTORING/YYYY-MM-DD.md)에도 기록한다
+- 작업이 완료되는데로 팔로업하여 tasks.md에서 완료된 작업은 체크 표시(`[x]`)하고, 완료된 내용을 그대로 복사하여 날짜별 파일(REFACTORING/YYYY-MM-DD.md)에도 기록한다
 
 ## 커밋 메세지 규칙
 - 커밋 메시지는 한국어로 작성한다
