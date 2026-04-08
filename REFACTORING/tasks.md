@@ -30,11 +30,11 @@
   - HTTP 상태 코드별 구조화된 응답 모델
   - Phase 5에서 각 엔드포인트에 적용
 
-- [ ] **환경 변수 관리 (`app/config.py`)**
+- [x] **환경 변수 관리 (`app/config.py`)**
   - Pydantic BaseSettings + Field로 엄격한 검증 (서버 시작 전 100% 문제 감지)
   - `@lru_cache` 데코레이터로 Singleton 패턴 (잦은 호출 성능 저하 방지)
-  - 대상: APP_PASSWORD, ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_KEY, PORT, CORS origins 등
-  - 기존 `os.getenv()` 산재 → `settings.XXX`로 통일
+  - 대상: APP_PASSWORD, ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_KEY, PORT, ENV
+  - 기존 `os.getenv()` 산재 → `get_settings().XXX`로 통일
   - 필수 변수 누락 시 서버 시작 실패 (ValidationError)
 
 #### Phase 2: 데이터 레이어 기반 구축

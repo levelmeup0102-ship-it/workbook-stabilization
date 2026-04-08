@@ -4,7 +4,7 @@ from app.config import get_settings
 
 
 def setup_logger() -> None:
-    logger.remove()
+    logger.remove() # 이전 로거 설정 초기화 
 
     env = get_settings().env
     level = "DEBUG" if env == "dev" else "INFO"
@@ -16,7 +16,7 @@ def setup_logger() -> None:
     logger.level("CRITICAL", color="<bold><red>")
 
     logger.add(
-        sys.stdout,
+        sys.stdout, # local print
         level=level,
         format=(
             "<dim>{time:YYYY-MM-DD HH:mm:ss}</dim> "

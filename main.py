@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """Workbook webapp server v12 - stable local + supabase passages, cache status"""
-import os
-import json
 import hashlib
 import re
 import shutil
@@ -26,8 +24,6 @@ APP_PASSWORD = get_settings().app_password.get_secret_value()
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 
-PASSAGES_FILE = DATA_DIR / "passages.json"  # data/ 안에 저장 → 볼륨으로 영속
-
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -46,11 +42,10 @@ def _verify(r: Request) -> None:
 
 
 # ============================================================
-# DB Load/Save (Supabase first, local fallback)
+# DB Load/Save (Supabase)
 # ============================================================
 async def _load_db():
-    """Load passages - Supabase first, local fallback"""
-    # Supabase
+    """Load passages from Supabase"""
     try:
         import supa
         if supa._enabled():
@@ -73,22 +68,10 @@ async def _load_db():
     except Exception as e:
         print(f"[supa] load error: {e}")
 
-    # Local fallback
-    if PASSAGES_FILE.exists():
-        try:
-            return json.loads(PASSAGES_FILE.read_text(encoding="utf-8"))
-        except Exception as e:
-            print(f"[local] passages.json parse error: {e}")
-
     return {"books": {}}
 
 async def _save_db(d):
-    """Save passages - local + Supabase (batch)"""
-    # local
-    PASSAGES_FILE.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("[save_db] local file written OK")
-
-    # supabase passages sync (best-effort)
+    """Save passages to Supabase"""
     try:
         import supa
         if not supa._enabled():
@@ -168,7 +151,6 @@ async def index():
 async def version():
     key = get_settings().anthropic_api_key.get_secret_value()
 
-    pf_exists = PASSAGES_FILE.exists()
     passage_count = 0
     supa_count = 0
     supa_ok = False
@@ -194,8 +176,6 @@ async def version():
     return {
         "version": APP_VERSION,
         "key_ok": len(key) > 50,
-        "passages_file": str(PASSAGES_FILE),
-        "passages_exist": pf_exists,
         "passage_count": passage_count,
         "supa_ok": supa_ok,
         "supa_count": supa_count,
