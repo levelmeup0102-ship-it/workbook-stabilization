@@ -18,6 +18,7 @@ for p in Path(".").glob("__pycache__"):
     shutil.rmtree(p, ignore_errors=True)
 
 from app.config import get_settings
+from app.repositories import passage_repo
 
 APP_PASSWORD = get_settings().app_password.get_secret_value()
 
@@ -40,68 +41,6 @@ def _verify(r: Request) -> None:
     if got != _token(APP_PASSWORD):
         raise HTTPException(401)
 
-
-# ============================================================
-# DB Load/Save (Supabase)
-# ============================================================
-async def _load_db():
-    """Load passages from Supabase"""
-    try:
-        import supa
-        if supa._enabled():
-            rows = await supa.get_all_passages()
-            if isinstance(rows, list) and rows:
-                db = {"books": {}}
-                for r in rows:
-                    bk = r.get("book", "")
-                    unit = r.get("unit", "")
-                    pid = r.get("pid", "")
-                    if not (bk and unit and pid):
-                        continue
-                    db["books"].setdefault(bk, {"units": {}})
-                    db["books"][bk]["units"].setdefault(unit, {"passages": {}})
-                    db["books"][bk]["units"][unit]["passages"][pid] = {
-                        "title": r.get("title", pid),
-                        "text": r.get("passage_text", ""),
-                    }
-                return db
-    except Exception as e:
-        print(f"[supa] load error: {e}")
-
-    return {"books": {}}
-
-async def _save_db(d):
-    """Save passages to Supabase"""
-    try:
-        import supa
-        if not supa._enabled():
-            print("[save_db] Supabase not enabled")
-            return
-
-        rows = []
-        for bk, bd in d.get("books", {}).items():
-            for unit, ud in bd.get("units", {}).items():
-                for pid, pi in ud.get("passages", {}).items():
-                    rows.append({
-                        "book": bk,
-                        "unit": unit,
-                        "pid": pid,
-                        "title": pi.get("title", pid),
-                        "passage_text": pi.get("text", ""),
-                    })
-
-        if not rows:
-            return
-
-        batch_size = 50
-        for start in range(0, len(rows), batch_size):
-            batch = rows[start:start + batch_size]
-            print(f"[save_db] Supabase upsert batch {start//batch_size + 1} ({len(batch)} rows)")
-            await supa.upsert_passages_bulk(batch)
-
-        print(f"[save_db] Supabase sync done: {len(rows)} rows total")
-    except Exception as e:
-        print(f"[supa] save error: {e}")
 
 
 # ============================================================
@@ -156,7 +95,7 @@ async def version():
     supa_ok = False
 
     try:
-        db = await _load_db()
+        db = await passage_repo.get_all()
         for bk in db.get("books", {}).values():
             for ud in bk.get("units", {}).values():
                 passage_count += len(ud.get("passages", {}))
@@ -194,7 +133,7 @@ async def auth(request: Request):
 @app.get("/api/passages")
 async def list_passages(request: Request):
     _verify(request)
-    db = await _load_db()
+    db = await passage_repo.get_all()
     result = []
     for bk, bd in db.get("books", {}).items():
         for unit, ud in bd.get("units", {}).items():
@@ -223,7 +162,7 @@ async def upload_passages(request: Request):
         raise HTTPException(400, "text 필요")
 
     parts = re.split(r"###(.+?)###", text)
-    db = await _load_db()
+    db = await passage_repo.get_all()
     db.setdefault("books", {})
     db["books"].setdefault(book, {"units": {}})
 
@@ -248,7 +187,7 @@ async def upload_passages(request: Request):
         db["books"][book]["units"][unit_name]["passages"][pid] = {"title": title, "text": passage}
         count += 1
 
-    await _save_db(db)
+    await passage_repo.save_all(db)
     print(f"[upload] saved ({count} passages) book='{book}'")
     return {"ok": True, "count": count}
 
@@ -266,7 +205,7 @@ async def delete_passage_api(request: Request):
     if not all([book, unit, pid]):
         raise HTTPException(400, "book, unit, pid 필요")
 
-    db = await _load_db()
+    db = await passage_repo.get_all()
     try:
         del db["books"][book]["units"][unit]["passages"][pid]
         # 빈 단원/교재 정리
@@ -277,7 +216,7 @@ async def delete_passage_api(request: Request):
     except Exception:
         raise HTTPException(404, "passage not found")
 
-    await _save_db(db)
+    await passage_repo.save_all(db)
 
     # 로컬 캐시도 삭제
     ck = _ck(book, unit, pid)
@@ -286,13 +225,7 @@ async def delete_passage_api(request: Request):
         shutil.rmtree(cache_dir, ignore_errors=True)
         print(f"[cache] deleted local cache dir {ck}")
 
-    # Supabase passage row 삭제 (best-effort)
-    try:
-        import supa
-        if supa._enabled():
-            await supa.delete_passage(book, unit, pid)
-    except Exception as e:
-        print(f"[supa] delete passage error: {e}")
+    await passage_repo.delete_passage(book, unit, pid)
 
     return {"ok": True}
 
@@ -306,7 +239,7 @@ async def delete_book_api(request: Request):
     if not book:
         raise HTTPException(400, "book 필요")
 
-    db = await _load_db()
+    db = await passage_repo.get_all()
     if book not in db.get("books", {}):
         raise HTTPException(404, "book not found")
 
@@ -320,15 +253,9 @@ async def delete_book_api(request: Request):
     print(f"[cache] deleted all local cache for book '{book}'")
 
     del db["books"][book]
-    await _save_db(db)
+    await passage_repo.save_all(db)
 
-    # Supabase에서도 삭제 (best-effort)
-    try:
-        import supa
-        if supa._enabled():
-            await supa.delete_book(book)
-    except Exception as e:
-        print(f"[supa] delete book error: {e}")
+    await passage_repo.delete_book(book)
 
     return {"ok": True}
 
@@ -342,7 +269,7 @@ async def sync_supabase(request: Request):
         if not supa._enabled():
             return {"ok": False, "error": "Supabase not enabled"}
 
-        db = await _load_db()
+        db = await passage_repo.get_all()
 
         rows = []
         for bk, bd in db.get("books", {}).items():
@@ -416,7 +343,7 @@ async def clear_cache(request: Request):
             print(f"[cache] supabase delete error: {e}")
 
     elif scope == "all" and book:
-        db = await _load_db()
+        db = await passage_repo.get_all()
         if book in db.get("books", {}):
             for u, ud in db["books"][book].get("units", {}).items():
                 for p in ud.get("passages", {}).keys():
@@ -467,7 +394,7 @@ async def generate(request: Request):
     if not all([book, unit, pid]):
         raise HTTPException(400, "book, unit, passage_id 필요")
 
-    db = await _load_db()
+    db = await passage_repo.get_all()
 
     try:
         pinfo = db["books"][book]["units"][unit]["passages"][pid]
