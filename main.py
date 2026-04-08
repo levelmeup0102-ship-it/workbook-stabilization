@@ -19,6 +19,7 @@ for p in Path(".").glob("__pycache__"):
 
 from app.config import get_settings
 from app.repositories import passage_repo
+from app.log.events import log_io_success, log_io_failure
 
 APP_PASSWORD = get_settings().app_password.get_secret_value()
 
@@ -46,9 +47,9 @@ def _verify(r: Request) -> None:
 # ============================================================
 # Cache Key / Cache Check
 # ============================================================
-def _ck(book: str, unit: str, pid: str) -> str:
+def _ck(book_name: str, unit: str, lesson: str) -> str:
     """캐시 키: 한국어 → ASCII 해시로 변환"""
-    raw = f"{book}_{unit}_{pid}"
+    raw = f"{book_name}_{unit}_{lesson}"
     h = hashlib.md5(raw.encode("utf-8")).hexdigest()[:12]
     nums = re.findall(r"\d+", raw)
     prefix = "_".join(nums) if nums else "p"
@@ -137,13 +138,12 @@ async def list_passages(request: Request):
     result = []
     for bk, bd in db.get("books", {}).items():
         for unit, ud in bd.get("units", {}).items():
-            for pid, pi in ud.get("passages", {}).items():
-                ck = _ck(bk, unit, pid)
+            for lesson, pi in ud.get("passages", {}).items():
+                ck = _ck(bk, unit, lesson)
                 result.append({
                     "book": bk,
                     "unit": unit,
-                    "id": pid,  # 프론트에서 p.id 로 씀
-                    "title": pi.get("title", pid),
+                    "id": lesson,  # 프론트에서 p.id 로 씀
                     "cache_status": "ready" if await _is_cached(ck) else "not_ready",
                 })
     return result
@@ -153,10 +153,10 @@ async def list_passages(request: Request):
 async def upload_passages(request: Request):
     _verify(request)
     body = await request.json()
-    book = (body.get("book") or "").strip()
+    book_name = (body.get("book") or "").strip()
     text = body.get("text") or ""
 
-    if not book:
+    if not book_name:
         raise HTTPException(400, "book 필요")
     if not text.strip():
         raise HTTPException(400, "text 필요")
@@ -164,12 +164,12 @@ async def upload_passages(request: Request):
     parts = re.split(r"###(.+?)###", text)
     db = await passage_repo.get_all()
     db.setdefault("books", {})
-    db["books"].setdefault(book, {"units": {}})
+    db["books"].setdefault(book_name, {"units": {}})
 
     count = 0
 
     for i in range(1, len(parts), 2):
-        title = parts[i].strip()
+        header = parts[i].strip()
         passage = parts[i + 1].strip() if i + 1 < len(parts) else ""
         if not passage:
             continue
@@ -177,18 +177,18 @@ async def upload_passages(request: Request):
         # 다양한 교재 형식 매칭
         m = re.match(
             r"(\d+강|\d+과|Lesson\s*\d+|L\d+|Chapter\s*\d+|Unit\s*\d+|\d+단원|SL)\s*(.*)",
-            title,
+            header,
             re.IGNORECASE,
         )
         unit_name = m.group(1).strip() if m else "etc"
-        pid = m.group(2).strip() if (m and m.group(2).strip()) else title
+        lesson = m.group(2).strip() if (m and m.group(2).strip()) else header
 
-        db["books"][book]["units"].setdefault(unit_name, {"passages": {}})
-        db["books"][book]["units"][unit_name]["passages"][pid] = {"title": title, "text": passage}
+        db["books"][book_name]["units"].setdefault(unit_name, {"passages": {}})
+        db["books"][book_name]["units"][unit_name]["passages"][lesson] = {"text": passage}
         count += 1
 
     await passage_repo.save_all(db)
-    print(f"[upload] saved ({count} passages) book='{book}'")
+    log_io_success("passages 업로드 완료", book_name=book_name, count=count)
     return {"ok": True, "count": count}
 
 
@@ -199,33 +199,33 @@ async def delete_passage_api(request: Request):
     body = await request.json()
 
     # 프론트 deletePassage()는 {book, unit, pid}로 보냄
-    book = body.get("book")
+    book_name = body.get("book")
     unit = body.get("unit")
-    pid = body.get("pid")
-    if not all([book, unit, pid]):
+    lesson = body.get("pid")
+    if not all([book_name, unit, lesson]):
         raise HTTPException(400, "book, unit, pid 필요")
 
     db = await passage_repo.get_all()
     try:
-        del db["books"][book]["units"][unit]["passages"][pid]
+        del db["books"][book_name]["units"][unit]["passages"][lesson]
         # 빈 단원/교재 정리
-        if not db["books"][book]["units"][unit]["passages"]:
-            del db["books"][book]["units"][unit]
-        if not db["books"][book]["units"]:
-            del db["books"][book]
+        if not db["books"][book_name]["units"][unit]["passages"]:
+            del db["books"][book_name]["units"][unit]
+        if not db["books"][book_name]["units"]:
+            del db["books"][book_name]
     except Exception:
         raise HTTPException(404, "passage not found")
 
     await passage_repo.save_all(db)
 
     # 로컬 캐시도 삭제
-    ck = _ck(book, unit, pid)
+    ck = _ck(book_name, unit, lesson)
     cache_dir = DATA_DIR / ck
     if cache_dir.exists():
         shutil.rmtree(cache_dir, ignore_errors=True)
-        print(f"[cache] deleted local cache dir {ck}")
+        log_io_success("로컬 캐시 삭제", cache_key=ck)
 
-    await passage_repo.delete_passage(book, unit, pid)
+    await passage_repo.delete_passage(book_name, unit, lesson)
 
     return {"ok": True}
 
@@ -235,27 +235,27 @@ async def delete_book_api(request: Request):
     """교재 전체 삭제"""
     _verify(request)
     body = await request.json()
-    book = body.get("book")
-    if not book:
+    book_name = body.get("book")
+    if not book_name:
         raise HTTPException(400, "book 필요")
 
     db = await passage_repo.get_all()
-    if book not in db.get("books", {}):
+    if book_name not in db.get("books", {}):
         raise HTTPException(404, "book not found")
 
     # 로컬 캐시도 삭제
-    for unit, ud in db["books"][book].get("units", {}).items():
-        for pid in ud.get("passages", {}).keys():
-            ck = _ck(book, unit, pid)
+    for unit, ud in db["books"][book_name].get("units", {}).items():
+        for lesson in ud.get("passages", {}).keys():
+            ck = _ck(book_name, unit, lesson)
             cache_dir = DATA_DIR / ck
             if cache_dir.exists():
                 shutil.rmtree(cache_dir, ignore_errors=True)
-    print(f"[cache] deleted all local cache for book '{book}'")
+    log_io_success("교재 로컬 캐시 전체 삭제", book_name=book_name)
 
-    del db["books"][book]
+    del db["books"][book_name]
     await passage_repo.save_all(db)
 
-    await passage_repo.delete_book(book)
+    await passage_repo.delete_book(book_name)
 
     return {"ok": True}
 
@@ -386,29 +386,28 @@ async def generate(request: Request):
     _verify(request)
     body = await request.json()
 
-    book = body.get("book")
+    book_name = body.get("book")
     unit = body.get("unit")
-    pid = body.get("passage_id")
+    lesson = body.get("passage_id")
     levels = body.get("levels")
 
-    if not all([book, unit, pid]):
+    if not all([book_name, unit, lesson]):
         raise HTTPException(400, "book, unit, passage_id 필요")
 
     db = await passage_repo.get_all()
 
     try:
-        pinfo = db["books"][book]["units"][unit]["passages"][pid]
+        pinfo = db["books"][book_name]["units"][unit]["passages"][lesson]
     except Exception as e:
-        print(f"[generate] passage not found: {e}")
-        raise HTTPException(404, f"passage not found: book={book}, unit={unit}, pid={pid}")
+        log_io_failure("passage 조회 실패", book_name=book_name, unit=unit, lesson=lesson, error=str(e))
+        raise HTTPException(404, f"passage not found: book={book_name}, unit={unit}, lesson={lesson}")
 
     passage_text = pinfo.get("text", "")
-    title = pinfo.get("title", pid)
 
     m = re.match(r"(\d+)", unit or "")
     lesson_num = m.group(1) if m else "00"
 
-    ck = _ck(book, unit, pid)
+    ck = _ck(book_name, unit, lesson)
 
     try:
         import pipeline as pl
@@ -421,8 +420,8 @@ async def generate(request: Request):
         meta = {
             "lesson_num": lesson_num,
             "lesson_n": lesson_num,
-            "challenge_title": title,
-            "subject": book,
+            "challenge_title": f"{unit} {lesson}",
+            "subject": book_name,
         }
 
         result_path = pl.process_passage(
